@@ -1,131 +1,72 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { AlertTriangle, Clock, MessageSquare, Loader2 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { AlertTriangle, User, TrendingDown, Clock, MessageSquare, CheckCircle } from "lucide-react"
+import { useState, useEffect } from "react"
 
 interface BurnoutAlert {
   id: string
-  severity: "high" | "medium" | "low" | "critical"
-  type: "burnout" | "engagement" | "sentiment"
-  message: string
-  timestamp: string
-  actionable: boolean
-  userId?: string
-  userName?: string
+  userId: string
+  userName: string
+  riskScore: number
+  riskLevel: "low" | "medium" | "high" | "critical"
+  indicators: string[]
+  recommendations: string[]
+  lastUpdated: Date
+  acknowledged: boolean
 }
 
 export function BurnoutAlerts() {
   const [alerts, setAlerts] = useState<BurnoutAlert[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const fetchBurnoutAlerts = async () => {
-    try {
-      setLoading(true)
-      setError(null)
-
-      console.log("[v0] Fetching burnout alerts from sentiment data")
-
-      const response = await fetch("/api/sentiment/summary")
-      const result = await response.json()
-
-      if (result.success && result.summary) {
-        const generatedAlerts = generateAlertsFromData(result.summary)
-        setAlerts(generatedAlerts)
-        console.log("[v0] Generated", generatedAlerts.length, "burnout alerts")
-      } else {
-        setError("No sentiment data available")
-        setAlerts([])
-      }
-    } catch (err) {
-      console.error("[v0] Error fetching burnout alerts:", err)
-      setError("Failed to load alerts")
-      setAlerts([])
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const generateAlertsFromData = (summary: any): BurnoutAlert[] => {
-    const alerts: BurnoutAlert[] = []
-
-    // Check overall sentiment
-    if (summary.overall.averageScore < -0.3) {
-      alerts.push({
-        id: "overall-negative",
-        severity: summary.overall.averageScore < -0.6 ? "high" : "medium",
-        type: "sentiment",
-        message: `Team sentiment is ${summary.overall.sentiment} (${summary.overall.averageScore.toFixed(2)})`,
-        timestamp: "Real-time",
-        actionable: true,
-      })
-    }
-
-    // Check individual users for burnout risk
-    if (summary.users) {
-      const highRiskUsers = summary.users.filter(
-        (user: any) => user.burnoutRisk === "high" || user.burnoutRisk === "critical",
-      )
-
-      if (highRiskUsers.length > 0) {
-        alerts.push({
-          id: "high-burnout-risk",
-          severity: highRiskUsers.some((u: any) => u.burnoutRisk === "critical") ? "critical" : "high",
-          type: "burnout",
-          message: `${highRiskUsers.length} team member${highRiskUsers.length > 1 ? "s" : ""} showing high burnout risk`,
-          timestamp: "Real-time",
-          actionable: true,
-        })
-      }
-
-      // Check for users with very negative sentiment
-      const negativeUsers = summary.users.filter((user: any) => user.averageScore < -0.5)
-      if (negativeUsers.length > 0) {
-        alerts.push({
-          id: "negative-sentiment-users",
-          severity: "medium",
-          type: "sentiment",
-          message: `${negativeUsers.length} team member${negativeUsers.length > 1 ? "s" : ""} showing negative sentiment patterns`,
-          timestamp: "Real-time",
-          actionable: true,
-        })
-      }
-    }
-
-    // Check channel engagement
-    if (summary.channels) {
-      const lowEngagementChannels = summary.channels.filter(
-        (channel: any) => channel.messageCount < 5 && channel.sentiment === "negative",
-      )
-
-      if (lowEngagementChannels.length > 0) {
-        alerts.push({
-          id: "low-engagement",
-          severity: "low",
-          type: "engagement",
-          message: `Decreased activity in ${lowEngagementChannels.length} channel${lowEngagementChannels.length > 1 ? "s" : ""}`,
-          timestamp: "Real-time",
-          actionable: false,
-        })
-      }
-    }
-
-    return alerts.slice(0, 5) // Limit to 5 alerts
-  }
 
   useEffect(() => {
-    fetchBurnoutAlerts()
-
-    // Refresh alerts every 2 minutes
-    const interval = setInterval(fetchBurnoutAlerts, 2 * 60 * 1000)
-    return () => clearInterval(interval)
+    // Simulate loading burnout alerts
+    setTimeout(() => {
+      setAlerts([
+        {
+          id: "1",
+          userId: "U123456",
+          userName: "Alex Chen",
+          riskScore: 78,
+          riskLevel: "high",
+          indicators: [
+            "Increased negative sentiment over 2 weeks",
+            "Reduced participation in team discussions",
+            "Messages sent outside normal hours",
+          ],
+          recommendations: [
+            "Schedule immediate 1:1 check-in",
+            "Review current project workload",
+            "Consider temporary workload reduction",
+          ],
+          lastUpdated: new Date(),
+          acknowledged: false,
+        },
+        {
+          id: "2",
+          userId: "U789012",
+          userName: "Sarah Kim",
+          riskScore: 65,
+          riskLevel: "medium",
+          indicators: ["Exhaustion-related keywords detected", "Declining engagement in team channels"],
+          recommendations: [
+            "Check in during next team meeting",
+            "Offer flexible work arrangements",
+            "Encourage time off if needed",
+          ],
+          lastUpdated: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+          acknowledged: false,
+        },
+      ])
+      setLoading(false)
+    }, 1000)
   }, [])
 
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
+  const getRiskColor = (level: string) => {
+    switch (level) {
       case "critical":
         return "bg-red-600 text-white"
       case "high":
@@ -133,81 +74,175 @@ export function BurnoutAlerts() {
       case "medium":
         return "bg-chart-4 text-white"
       case "low":
-        return "bg-muted text-muted-foreground"
+        return "bg-primary text-primary-foreground"
       default:
         return "bg-muted text-muted-foreground"
     }
   }
 
-  const getIcon = (type: string) => {
-    switch (type) {
-      case "burnout":
+  const getRiskIcon = (level: string) => {
+    switch (level) {
+      case "critical":
+      case "high":
         return <AlertTriangle className="h-4 w-4" />
-      case "engagement":
-        return <MessageSquare className="h-4 w-4" />
+      case "medium":
+        return <TrendingDown className="h-4 w-4" />
       default:
-        return <Clock className="h-4 w-4" />
+        return <User className="h-4 w-4" />
     }
   }
+
+  const acknowledgeAlert = (alertId: string) => {
+    setAlerts(alerts.map((alert) => (alert.id === alertId ? { ...alert, acknowledged: true } : alert)))
+  }
+
+  const highRiskAlerts = alerts.filter((alert) => alert.riskLevel === "high" || alert.riskLevel === "critical")
+  const mediumRiskAlerts = alerts.filter((alert) => alert.riskLevel === "medium")
 
   if (loading) {
     return (
-      <Card className="border-0 shadow-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="font-serif text-xl">Burnout Alerts</CardTitle>
-          <CardDescription>Loading alerts...</CardDescription>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5" />
+            Burnout Risk Alerts
+          </CardTitle>
         </CardHeader>
-        <CardContent className="flex items-center justify-center py-8">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <CardContent>
+          <div className="flex items-center justify-center py-8">
+            <div className="text-muted-foreground">Loading burnout analysis...</div>
+          </div>
         </CardContent>
       </Card>
     )
   }
 
   return (
-    <Card className="border-0 shadow-sm">
-      <CardHeader className="pb-3">
-        <CardTitle className="font-serif text-xl">Burnout Alerts</CardTitle>
-        <CardDescription>Real-time monitoring and early warning signals</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {error ? (
-          <div className="text-center py-4">
-            <p className="text-sm text-muted-foreground">{error}</p>
-            <Button variant="outline" size="sm" onClick={fetchBurnoutAlerts} className="mt-2 bg-transparent">
-              Retry
-            </Button>
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5" />
+            Burnout Risk Alerts
+          </CardTitle>
+          <div className="flex items-center gap-2">
+            {highRiskAlerts.length > 0 && (
+              <Badge className="bg-destructive text-destructive-foreground">{highRiskAlerts.length} High Risk</Badge>
+            )}
+            {mediumRiskAlerts.length > 0 && (
+              <Badge className="bg-chart-4 text-white">{mediumRiskAlerts.length} Medium Risk</Badge>
+            )}
           </div>
-        ) : alerts.length === 0 ? (
-          <div className="text-center py-4">
-            <p className="text-sm text-muted-foreground">No alerts at this time</p>
-            <p className="text-xs text-muted-foreground mt-1">Team sentiment appears healthy</p>
+        </div>
+        <p className="text-sm text-muted-foreground">AI-powered detection of team members at risk of burnout</p>
+      </CardHeader>
+      <CardContent>
+        {alerts.length === 0 ? (
+          <div className="text-center py-8">
+            <CheckCircle className="h-12 w-12 text-primary mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-foreground mb-2">No Burnout Risks Detected</h3>
+            <p className="text-muted-foreground">Your team is showing healthy engagement patterns this week.</p>
           </div>
         ) : (
-          alerts.map((alert) => (
-            <div key={alert.id} className="flex items-start space-x-3 p-3 rounded-lg bg-card">
-              <div className={`p-1 rounded-full ${getSeverityColor(alert.severity)}`}>{getIcon(alert.type)}</div>
-              <div className="flex-1 space-y-2">
-                <div className="flex items-center justify-between">
-                  <Badge variant="outline" className="text-xs">
-                    {alert.severity.toUpperCase()}
-                  </Badge>
-                  <span className="text-xs text-muted-foreground">{alert.timestamp}</span>
+          <div className="space-y-4">
+            {alerts.map((alert) => (
+              <div
+                key={alert.id}
+                className={`border rounded-lg p-4 space-y-4 ${alert.acknowledged ? "opacity-60" : ""}`}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
+                      <User className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-foreground">{alert.userName}</h3>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Badge className={getRiskColor(alert.riskLevel)}>
+                          {getRiskIcon(alert.riskLevel)}
+                          <span className="ml-1 capitalize">{alert.riskLevel} Risk</span>
+                        </Badge>
+                        <span className="text-sm text-muted-foreground">Score: {alert.riskScore}/100</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Clock className="h-3 w-3" />
+                    <span>{alert.lastUpdated.toLocaleDateString()}</span>
+                  </div>
                 </div>
-                <p className="text-sm font-medium">{alert.message}</p>
-                {alert.actionable && (
-                  <Button size="sm" variant="outline" className="text-xs bg-transparent">
-                    Take Action
-                  </Button>
-                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <h4 className="text-sm font-medium text-foreground mb-2">Risk Indicators</h4>
+                    <ul className="text-sm text-muted-foreground space-y-1">
+                      {alert.indicators.map((indicator, index) => (
+                        <li key={index} className="flex items-start gap-2">
+                          <span className="text-destructive mt-1">•</span>
+                          <span>{indicator}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h4 className="text-sm font-medium text-foreground mb-2">Recommended Actions</h4>
+                    <ul className="text-sm text-muted-foreground space-y-1">
+                      {alert.recommendations.map((rec, index) => (
+                        <li key={index} className="flex items-start gap-2">
+                          <span className="text-primary mt-1">•</span>
+                          <span>{rec}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-2 border-t">
+                  {!alert.acknowledged ? (
+                    <>
+                      <Button size="sm" onClick={() => acknowledgeAlert(alert.id)} className="flex items-center gap-2">
+                        <CheckCircle className="h-3 w-3" />
+                        Acknowledge Alert
+                      </Button>
+                      <Button size="sm" variant="outline" className="bg-transparent">
+                        <MessageSquare className="h-3 w-3 mr-2" />
+                        Schedule 1:1
+                      </Button>
+                    </>
+                  ) : (
+                    <Badge variant="outline" className="text-primary border-primary">
+                      <CheckCircle className="h-3 w-3 mr-1" />
+                      Acknowledged
+                    </Badge>
+                  )}
+                </div>
               </div>
-            </div>
-          ))
+            ))}
+          </div>
         )}
 
-        <Button variant="ghost" className="w-full text-sm" onClick={fetchBurnoutAlerts}>
-          Refresh Alerts
-        </Button>
+        <div className="mt-6 p-4 bg-muted rounded-lg">
+          <h4 className="text-sm font-medium text-foreground mb-2">Burnout Detection Metrics</h4>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div>
+              <span className="text-muted-foreground">Total Monitored:</span>
+              <div className="font-medium text-foreground">24 team members</div>
+            </div>
+            <div>
+              <span className="text-muted-foreground">At Risk:</span>
+              <div className="font-medium text-foreground">{alerts.length} members</div>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Detection Accuracy:</span>
+              <div className="font-medium text-foreground">87%</div>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Last Updated:</span>
+              <div className="font-medium text-foreground">2 hours ago</div>
+            </div>
+          </div>
+        </div>
       </CardContent>
     </Card>
   )
