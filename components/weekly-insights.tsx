@@ -38,14 +38,13 @@ export function WeeklyInsights() {
           const dailyData = []
           const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
-          // Convert overall sentiment from 0-1 scale to 0-10 scale
-          const overallSentiment = (data.overallSentiment || 0) * 10
+          const overallSentiment = data.overallSentiment || 0
           const avgMessagesPerDay = Math.ceil((data.totalMessages || 0) / 7)
 
           for (let i = 0; i < 7; i++) {
             // Create realistic daily variation around the overall sentiment
-            const variation = (Math.random() - 0.5) * 2 // -1 to +1 variation
-            const daySentiment = Math.max(0, Math.min(10, overallSentiment + variation))
+            const variation = (Math.random() - 0.5) * 0.2 // -0.1 to +0.1 variation
+            const daySentiment = Math.max(0, Math.min(1, overallSentiment + variation))
 
             dailyData.push({
               day: days[i],
@@ -56,10 +55,10 @@ export function WeeklyInsights() {
           setSentimentData(dailyData)
         }
 
-        const sentimentScore = (data.overallSentiment || 0) * 10
-        if (sentimentScore >= 6.5) {
+        const sentimentScore = data.overallSentiment || 0
+        if (sentimentScore >= 0.65) {
           setOverallTrend("up")
-        } else if (sentimentScore <= 4.5) {
+        } else if (sentimentScore <= 0.45) {
           setOverallTrend("down")
         } else {
           setOverallTrend("stable")
@@ -78,11 +77,11 @@ export function WeeklyInsights() {
         } else if (data.channelAnalysis && data.channelAnalysis.length > 0) {
           const channelCount = data.channelAnalysis.length
           const totalMessages = data.totalMessages || 0
-          const sentimentScore = (data.overallSentiment || 0) * 10
+          const sentimentScore = data.overallSentiment || 0
 
           setInsights([
             `Analyzed ${totalMessages} messages across ${channelCount} channels this week`,
-            `Overall team sentiment is ${sentimentScore >= 7 ? "positive" : sentimentScore >= 5 ? "neutral" : "concerning"} (${sentimentScore.toFixed(1)}/10)`,
+            `Overall team sentiment is ${sentimentScore >= 0.7 ? "positive" : sentimentScore >= 0.5 ? "neutral" : "concerning"} (${sentimentScore.toFixed(3)}/1)`,
             `${data.burnoutAlerts || 0} team members showing potential burnout indicators`,
           ])
         }
@@ -100,14 +99,14 @@ export function WeeklyInsights() {
   }, [])
 
   const getSentimentColor = (sentiment: number) => {
-    if (sentiment >= 7.5) return "bg-primary"
-    if (sentiment >= 6.5) return "bg-accent"
+    if (sentiment >= 0.75) return "bg-primary"
+    if (sentiment >= 0.65) return "bg-accent"
     return "bg-destructive"
   }
 
   const getSentimentLabel = (sentiment: number) => {
-    if (sentiment >= 7.5) return "Positive"
-    if (sentiment >= 6.5) return "Neutral"
+    if (sentiment >= 0.75) return "Positive"
+    if (sentiment >= 0.65) return "Neutral"
     return "Negative"
   }
 
@@ -172,11 +171,11 @@ export function WeeklyInsights() {
                   <div className="flex-1 bg-muted rounded-full h-2">
                     <div
                       className={`h-2 rounded-full ${getSentimentColor(day.sentiment)}`}
-                      style={{ width: `${Math.max((day.sentiment / 10) * 100, 5)}%` }}
+                      style={{ width: `${Math.max(day.sentiment * 100, 5)}%` }}
                     />
                   </div>
                   <div className="text-sm font-medium text-foreground w-8">
-                    {day.sentiment > 0 ? day.sentiment.toFixed(1) : "N/A"}
+                    {day.sentiment > 0 ? day.sentiment.toFixed(3) : "N/A"}
                   </div>
                   <Badge variant="secondary" className="text-xs">
                     {getSentimentLabel(day.sentiment)}

@@ -3,6 +3,7 @@ import { WeeklyInsights } from "@/components/weekly-insights"
 import { BurnoutAlerts } from "@/components/burnout-alerts"
 import { ActionableRecommendations } from "@/components/actionable-recommendations"
 import { WeeklyHeader } from "@/components/weekly-header"
+import { ChannelList } from "@/components/channel-list"
 
 export default function Home() {
   return (
@@ -15,6 +16,7 @@ export default function Home() {
           <WeeklyInsights />
           <BurnoutAlerts />
         </div>
+        <ChannelList />
         <ActionableRecommendations />
       </main>
     </div>
