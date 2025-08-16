@@ -1,33 +1,84 @@
+"use client"
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { TrendingUp, TrendingDown, Minus, Users, MessageSquare, AlertTriangle } from "lucide-react"
+import { useEffect, useState } from "react"
 
 export function WeeklyOverview() {
-  const metrics = [
+  const [metrics, setMetrics] = useState([
     {
       title: "Overall Team Sentiment",
-      value: "7.2",
-      change: "+0.3",
-      trend: "up",
+      value: "Loading...",
+      change: "",
+      trend: "stable",
       description: "out of 10",
       icon: Users,
     },
     {
       title: "Messages Analyzed",
-      value: "2,847",
-      change: "+12%",
-      trend: "up",
+      value: "Loading...",
+      change: "",
+      trend: "stable",
       description: "this week",
       icon: MessageSquare,
     },
     {
       title: "Burnout Risk Level",
-      value: "Low",
-      change: "Stable",
+      value: "Loading...",
+      change: "",
       trend: "stable",
-      description: "2 team members flagged",
+      description: "analyzing...",
       icon: AlertTriangle,
     },
-  ]
+  ])
+
+  useEffect(() => {
+    const fetchWeeklyData = async () => {
+      try {
+        console.log("[v0] Fetching weekly analysis data...")
+        const response = await fetch("/api/analysis/weekly")
+        const data = await response.json()
+
+        console.log("[v0] Weekly analysis response:", data)
+
+        if (data.error) {
+          console.error("[v0] API error:", data.error)
+          return
+        }
+
+        setMetrics([
+          {
+            title: "Overall Team Sentiment",
+            value: data.overallSentiment?.toFixed(1) || "N/A",
+            change: data.sentimentTrend || "No trend",
+            trend: data.sentimentTrend?.includes("+") ? "up" : data.sentimentTrend?.includes("-") ? "down" : "stable",
+            description: "out of 10",
+            icon: Users,
+          },
+          {
+            title: "Messages Analyzed",
+            value: data.totalMessages?.toLocaleString() || "0",
+            change: data.messagesTrend || "No data",
+            trend: "stable",
+            description: "this week",
+            icon: MessageSquare,
+          },
+          {
+            title: "Burnout Risk Level",
+            value: data.burnoutRisk?.level || "Unknown",
+            change: data.burnoutRisk?.trend || "Analyzing",
+            trend: data.burnoutRisk?.trend === "Increasing" ? "down" : "stable",
+            description: `${data.burnoutRisk?.flaggedMembers || 0} team members flagged`,
+            icon: AlertTriangle,
+          },
+        ])
+      } catch (error) {
+        console.error("[v0] Error fetching weekly data:", error)
+      }
+    }
+
+    fetchWeeklyData()
+  }, [])
 
   const getTrendIcon = (trend: string) => {
     switch (trend) {

@@ -230,14 +230,14 @@ export class WeeklyAnalysisService {
 
   async getLastWeekDateRange(): Promise<{ start: Date; end: Date }> {
     const now = new Date()
-    const lastMonday = new Date(now)
-    lastMonday.setDate(now.getDate() - now.getDay() - 6) // Last Monday
-    lastMonday.setHours(0, 0, 0, 0)
+    const start = new Date(now)
+    start.setDate(now.getDate() - 7) // 7 days ago
+    start.setHours(0, 0, 0, 0)
 
-    const lastFriday = new Date(lastMonday)
-    lastFriday.setDate(lastMonday.getDate() + 4) // Last Friday
-    lastFriday.setHours(23, 59, 59, 999)
+    const end = new Date(now)
+    end.setHours(23, 59, 59, 999) // Until now
 
-    return { start: lastMonday, end: lastFriday }
+    console.log("[v0] Date range:", { start: start.toISOString(), end: end.toISOString() })
+    return { start, end }
   }
 }

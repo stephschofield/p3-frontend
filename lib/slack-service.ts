@@ -61,6 +61,15 @@ export class SlackService {
       const oldest = Math.floor(startDate.getTime() / 1000).toString()
       const latest = Math.floor(endDate.getTime() / 1000).toString()
 
+      console.log(
+        "[v0] Fetching messages for channel",
+        channelId,
+        "from",
+        startDate.toISOString(),
+        "to",
+        endDate.toISOString(),
+      )
+
       const response = await fetch(
         `https://slack.com/api/conversations.history?channel=${channelId}&oldest=${oldest}&latest=${latest}&limit=1000`,
         {
@@ -78,8 +87,21 @@ export class SlackService {
         return []
       }
 
-      // Filter out bot messages and system messages
-      return data.messages.filter((msg: any) => msg.text && !msg.bot_id && msg.subtype !== "bot_message" && msg.user)
+      const allMessages = data.messages || []
+      const filteredMessages = allMessages.filter(
+        (msg: any) => msg.text && !msg.bot_id && msg.subtype !== "bot_message" && msg.user,
+      )
+
+      console.log(
+        "[v0] Channel",
+        channelId,
+        "- Total messages:",
+        allMessages.length,
+        "Filtered messages:",
+        filteredMessages.length,
+      )
+
+      return filteredMessages
     } catch (error) {
       console.log("[v0] Error fetching messages for channel", channelId, ":", error)
       return []
