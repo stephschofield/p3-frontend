@@ -78,32 +78,65 @@ export class WeeklyAnalysisService {
         const dailySentiments: number[][] = [[], [], [], [], [], [], []] // 7 days
 
         for (const message of messages) {
-          const sentiment = await this.sentimentService.analyzeSentiment(message.text)
-          sentimentResults.push(sentiment)
-          allSentimentScores.push(sentiment.score)
+          try {
+            const sentiment = await this.sentimentService.analyzeSentiment(message.text)
+            sentimentResults.push(sentiment)
+            allSentimentScores.push(sentiment.score)
 
-          // Track user activity
-          if (!userActivity.has(message.user)) {
-            userActivity.set(message.user, {
-              messageCount: 0,
-              sentiments: [],
-              timestamps: [],
-            })
+            // Track user activity
+            if (!userActivity.has(message.user)) {
+              userActivity.set(message.user, {
+                messageCount: 0,
+                sentiments: [],
+                timestamps: [],
+              })
+            }
+
+            const userData = userActivity.get(message.user)
+            userData.messageCount++
+            userData.sentiments.push(sentiment.score)
+            userData.timestamps.push(new Date(Number.parseFloat(message.ts) * 1000))
+
+            // Group by day of week
+            const messageDate = new Date(Number.parseFloat(message.ts) * 1000)
+            const dayOfWeek = messageDate.getDay()
+            dailySentiments[dayOfWeek].push(sentiment.score)
+          } catch (sentimentError) {
+            console.log("[v0] Sentiment analysis failed for message, using neutral:", sentimentError)
+            const neutralSentiment = {
+              score: 0,
+              confidence: 0.3,
+              emotions: { joy: 0.2, anger: 0.2, fear: 0.2, sadness: 0.2, surprise: 0.2 },
+              keywords: [],
+            }
+            sentimentResults.push(neutralSentiment)
+            allSentimentScores.push(0)
+
+            // Still track user activity even without sentiment
+            if (!userActivity.has(message.user)) {
+              userActivity.set(message.user, {
+                messageCount: 0,
+                sentiments: [],
+                timestamps: [],
+              })
+            }
+
+            const userData = userActivity.get(message.user)
+            userData.messageCount++
+            userData.sentiments.push(0)
+            userData.timestamps.push(new Date(Number.parseFloat(message.ts) * 1000))
+
+            const messageDate = new Date(Number.parseFloat(message.ts) * 1000)
+            const dayOfWeek = messageDate.getDay()
+            dailySentiments[dayOfWeek].push(0)
           }
-
-          const userData = userActivity.get(message.user)
-          userData.messageCount++
-          userData.sentiments.push(sentiment.score)
-          userData.timestamps.push(new Date(Number.parseFloat(message.ts) * 1000))
-
-          // Group by day of week
-          const messageDate = new Date(Number.parseFloat(message.ts) * 1000)
-          const dayOfWeek = messageDate.getDay()
-          dailySentiments[dayOfWeek].push(sentiment.score)
         }
 
         // Calculate channel metrics
-        const averageSentiment = sentimentResults.reduce((sum, s) => sum + s.score, 0) / sentimentResults.length
+        const averageSentiment =
+          sentimentResults.length > 0
+            ? sentimentResults.reduce((sum, s) => sum + s.score, 0) / sentimentResults.length
+            : 0
         const sentimentTrend = dailySentiments.map((day) =>
           day.length > 0 ? day.reduce((sum, s) => sum + s, 0) / day.length : 0,
         )
@@ -136,31 +169,33 @@ export class WeeklyAnalysisService {
         totalMessages += messages.length
       }
 
-      // Analyze burnout risks
       const burnoutAlerts: BurnoutAlert[] = []
       for (const [userId, activity] of userActivity.entries()) {
         if (activity.messageCount >= 5) {
-          // Only analyze users with sufficient activity
-          const userMessages = activity.sentiments.map((s: number, i: number) => `Message ${i + 1}: sentiment ${s}`)
+          try {
+            const userMessages = activity.sentiments.map((s: number, i: number) => `Message ${i + 1}: sentiment ${s}`)
+            const burnoutRisk = await this.sentimentService.analyzeBurnoutRisk(userMessages, activity)
 
-          const burnoutRisk = await this.sentimentService.analyzeBurnoutRisk(userMessages, activity)
-
-          if (burnoutRisk.overallRisk > 60) {
-            burnoutAlerts.push({
-              userId,
-              riskScore: burnoutRisk.overallRisk,
-              indicators: [
-                burnoutRisk.exhaustionKeywords > 50 ? "Exhaustion language detected" : "",
-                burnoutRisk.negativeSentimentTrend > 50 ? "Declining sentiment trend" : "",
-                burnoutRisk.reducedEngagement > 50 ? "Reduced engagement" : "",
-                burnoutRisk.workHoursPattern > 50 ? "Unhealthy work patterns" : "",
-              ].filter(Boolean),
-              recommendations: [
-                "Schedule a 1:1 check-in",
-                "Review current workload",
-                "Consider time off or reduced responsibilities",
-              ],
-            })
+            if (burnoutRisk.overallRisk > 60) {
+              burnoutAlerts.push({
+                userId,
+                riskScore: burnoutRisk.overallRisk,
+                indicators: [
+                  burnoutRisk.exhaustionKeywords > 50 ? "Exhaustion language detected" : "",
+                  burnoutRisk.negativeSentimentTrend > 50 ? "Declining sentiment trend" : "",
+                  burnoutRisk.reducedEngagement > 50 ? "Reduced engagement" : "",
+                  burnoutRisk.workHoursPattern > 50 ? "Unhealthy work patterns" : "",
+                ].filter(Boolean),
+                recommendations: [
+                  "Schedule a 1:1 check-in",
+                  "Review current workload",
+                  "Consider time off or reduced responsibilities",
+                ],
+              })
+            }
+          } catch (burnoutError) {
+            console.log("[v0] Burnout analysis failed for user:", userId, burnoutError)
+            // Continue without adding burnout alert for this user
           }
         }
       }
@@ -186,8 +221,17 @@ export class WeeklyAnalysisService {
         },
       }
 
-      // Generate insights
-      const insights = await this.sentimentService.generateWeeklyInsights(channelAnalyses, teamMetrics)
+      let insights: string[] = []
+      try {
+        insights = await this.sentimentService.generateWeeklyInsights(channelAnalyses, teamMetrics)
+      } catch (insightsError) {
+        console.log("[v0] Insights generation failed, using fallback:", insightsError)
+        insights = [
+          `Analyzed ${totalMessages} messages across ${channelAnalyses.length} channels`,
+          `${userActivity.size} team members were active this week`,
+          "Sentiment analysis temporarily unavailable - check Azure OpenAI configuration",
+        ]
+      }
 
       console.log("[v0] Weekly analysis completed:", {
         totalMessages,
@@ -209,21 +253,49 @@ export class WeeklyAnalysisService {
     } catch (error) {
       console.log("[v0] Error in weekly analysis:", error)
 
-      // Return fallback data on error
-      return {
-        weekStart,
-        weekEnd,
-        overallSentiment: 0.1,
-        totalMessages: 0,
-        channelAnalysis: [],
-        burnoutAlerts: [],
-        insights: ["Unable to generate insights - please check your configuration"],
-        teamMetrics: {
-          activeUsers: 0,
-          responseRate: 0,
-          engagementScore: 5,
-          moodDistribution: { positive: 0.33, neutral: 0.33, negative: 0.34 },
-        },
+      try {
+        const allChannels = await this.slackService.getChannels()
+        const selectedChannels = allChannels.filter((ch) => channelIds.includes(ch.id))
+
+        return {
+          weekStart,
+          weekEnd,
+          overallSentiment: 0.1,
+          totalMessages: 0,
+          channelAnalysis: selectedChannels.map((ch) => ({
+            channelId: ch.id,
+            channelName: ch.name,
+            messageCount: 0,
+            averageSentiment: 0,
+            sentimentTrend: [0, 0, 0, 0, 0, 0, 0],
+            topKeywords: [],
+            participationRate: 0,
+          })),
+          burnoutAlerts: [],
+          insights: ["Analysis temporarily unavailable - please check your Azure OpenAI configuration"],
+          teamMetrics: {
+            activeUsers: 0,
+            responseRate: 0,
+            engagementScore: 5,
+            moodDistribution: { positive: 0.33, neutral: 0.33, negative: 0.34 },
+          },
+        }
+      } catch (fallbackError) {
+        return {
+          weekStart,
+          weekEnd,
+          overallSentiment: 0.1,
+          totalMessages: 0,
+          channelAnalysis: [],
+          burnoutAlerts: [],
+          insights: ["Unable to generate insights - please check your configuration"],
+          teamMetrics: {
+            activeUsers: 0,
+            responseRate: 0,
+            engagementScore: 5,
+            moodDistribution: { positive: 0.33, neutral: 0.33, negative: 0.34 },
+          },
+        }
       }
     }
   }

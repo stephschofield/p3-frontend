@@ -33,29 +33,126 @@ export function ActionableRecommendations() {
     const fetchRecommendations = async () => {
       try {
         console.log("[v0] Fetching AI recommendations...")
-        const response = await fetch("/api/insights/generate")
+        const response = await fetch("/api/analysis/weekly")
         const data = await response.json()
 
-        if (data.recommendations && Array.isArray(data.recommendations)) {
-          setRecommendations(data.recommendations)
+        if (data.channelAnalysis && Array.isArray(data.channelAnalysis)) {
+          const recs: Recommendation[] = []
+
+          // Generate recommendations based on actual channel data
+          data.channelAnalysis.forEach((channel: any, index: number) => {
+            if (channel.averageSentiment < 0.4) {
+              recs.push({
+                id: `rec-sentiment-${channel.channelId}`,
+                priority: channel.averageSentiment < 0.2 ? "high" : "medium",
+                title: `Improve Sentiment in ${channel.channelName}`,
+                description: `Channel shows low sentiment (${(channel.averageSentiment * 10).toFixed(1)}/10) with ${channel.messageCount} messages analyzed. Consider team engagement initiatives.`,
+                impact: "High",
+                effort: "Medium",
+                timeline: "2-3 weeks",
+                category: "Team Engagement",
+                confidence: 85,
+                dataPoints: [
+                  `${channel.messageCount} messages analyzed in ${channel.channelName}`,
+                  `Average sentiment: ${(channel.averageSentiment * 10).toFixed(1)}/10`,
+                  `Participation rate: ${Math.round(channel.participationRate * 100)}%`,
+                ],
+                implementationSteps: [
+                  "Conduct team retrospective meeting",
+                  "Identify specific pain points and blockers",
+                  "Implement targeted engagement activities",
+                  "Monitor sentiment improvements weekly",
+                ],
+                successMetrics: [
+                  "Increase channel sentiment to >6.0/10",
+                  "Improve participation rate by 20%",
+                  "Reduce negative sentiment indicators",
+                ],
+                status: "pending",
+              })
+            }
+
+            if (channel.participationRate < 0.3 && channel.messageCount > 0) {
+              recs.push({
+                id: `rec-participation-${channel.channelId}`,
+                priority: "medium",
+                title: `Boost Participation in ${channel.channelName}`,
+                description: `Low participation rate (${Math.round(channel.participationRate * 100)}%) detected. Encourage more team engagement and communication.`,
+                impact: "Medium",
+                effort: "Low",
+                timeline: "1-2 weeks",
+                category: "Communication",
+                confidence: 75,
+                dataPoints: [
+                  `Participation rate: ${Math.round(channel.participationRate * 100)}%`,
+                  `${channel.messageCount} total messages this week`,
+                  "Communication patterns analysis",
+                ],
+                implementationSteps: [
+                  "Send team engagement survey",
+                  "Schedule regular check-ins",
+                  "Create discussion prompts and activities",
+                ],
+                successMetrics: [
+                  "Increase participation rate to >50%",
+                  "More frequent team interactions",
+                  "Improved communication flow",
+                ],
+                status: "pending",
+              })
+            }
+          })
+
+          // Add general recommendations based on overall data
+          if (data.overallSentiment < 0.5) {
+            recs.push({
+              id: "rec-overall-sentiment",
+              priority: "high",
+              title: "Address Overall Team Sentiment",
+              description: `Team sentiment is ${(data.overallSentiment * 10).toFixed(1)}/10 across ${data.totalMessages} messages. Implement comprehensive engagement strategy.`,
+              impact: "High",
+              effort: "High",
+              timeline: "4-6 weeks",
+              category: "Team Health",
+              confidence: 90,
+              dataPoints: [
+                `Overall sentiment: ${(data.overallSentiment * 10).toFixed(1)}/10`,
+                `${data.totalMessages} messages analyzed`,
+                `${data.channelAnalysis.length} channels monitored`,
+              ],
+              implementationSteps: [
+                "Conduct comprehensive team health assessment",
+                "Identify root causes of low sentiment",
+                "Develop targeted improvement plan",
+                "Implement regular pulse surveys",
+              ],
+              successMetrics: [
+                "Increase overall sentiment to >7.0/10",
+                "Reduce burnout risk indicators",
+                "Improve team satisfaction scores",
+              ],
+              status: "pending",
+            })
+          }
+
+          setRecommendations(recs.slice(0, 5)) // Limit to top 5 recommendations
         } else if (data.insights && Array.isArray(data.insights)) {
+          // Fallback to insights-based recommendations
           const recs = data.insights.slice(0, 3).map((insight: any, index: number) => {
-            // Extract text content from insight object or use as string
             let description = ""
             if (typeof insight === "string") {
               description = insight
             } else if (typeof insight === "object" && insight !== null) {
-              // Extract meaningful text from insight object
-              description = insight.description || insight.title || insight.summary || JSON.stringify(insight)
+              description = insight.description || insight.title || insight.summary || "AI-generated insight available"
             }
 
             return {
               id: `rec-${index}`,
-              priority: index === 0 ? "high" : "medium",
-              title: `Action Item ${index + 1}`,
+              priority: index === 0 ? "high" : ("medium" as const),
+              title: `Insight-Based Action ${index + 1}`,
               description,
-              impact: "Medium",
-              effort: "Low",
+              impact: "Medium" as const,
+              effort: "Low" as const,
               timeline: "1-2 weeks",
               category: "Team Engagement",
               confidence: 75 + Math.floor(Math.random() * 20),

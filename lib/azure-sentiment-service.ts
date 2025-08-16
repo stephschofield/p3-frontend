@@ -1,5 +1,5 @@
 interface SentimentResult {
-  score: number // -1 to 1
+  score: number // 0 to 1 (normalized from -1 to 1)
   confidence: number // 0 to 1
   emotions: {
     joy: number
@@ -36,11 +36,32 @@ export class AzureSentimentService {
     return !!(this.endpoint && this.apiKey && this.deploymentName)
   }
 
+  private normalizeSentiment(score: number): number {
+    // Convert from -1 to 1 range to 0 to 1 range
+    const normalized = (score + 1) / 2
+    // Ensure bounds are respected
+    return Math.max(0, Math.min(1, normalized))
+  }
+
+  private safeParseJSON(content: string): any {
+    try {
+      // Remove any markdown formatting that might be present
+      const cleanContent = content
+        .replace(/```json\n?/g, "")
+        .replace(/```\n?/g, "")
+        .trim()
+      return JSON.parse(cleanContent)
+    } catch (error) {
+      console.log("[v0] JSON parsing error:", error, "Content:", content)
+      return null
+    }
+  }
+
   async analyzeSentiment(text: string): Promise<SentimentResult> {
     if (!this.isConfigured()) {
       console.log("[v0] Azure OpenAI not configured, returning neutral sentiment")
       return {
-        score: 0,
+        score: 0.5, // Changed from 0 to 0.5 for true neutral in 0-1 range
         confidence: 0.5,
         emotions: { joy: 0.2, anger: 0.2, fear: 0.2, sadness: 0.2, surprise: 0.2 },
         keywords: [],
@@ -84,18 +105,33 @@ export class AzureSentimentService {
       }
 
       const data = await response.json()
-      const content = data.choices[0]?.message?.content
+      const content = data.choices?.[0]?.message?.content // Added optional chaining
 
       if (!content) {
         throw new Error("No content in response")
       }
 
-      return JSON.parse(content)
+      const parsed = this.safeParseJSON(content)
+      if (!parsed) {
+        throw new Error("Failed to parse JSON response")
+      }
+
+      return {
+        score: this.normalizeSentiment(parsed.score || 0), // Normalize -1,1 to 0,1 range
+        confidence: Math.max(0, Math.min(1, parsed.confidence || 0.3)),
+        emotions: {
+          joy: Math.max(0, Math.min(1, parsed.emotions?.joy || 0.2)),
+          anger: Math.max(0, Math.min(1, parsed.emotions?.anger || 0.2)),
+          fear: Math.max(0, Math.min(1, parsed.emotions?.fear || 0.2)),
+          sadness: Math.max(0, Math.min(1, parsed.emotions?.sadness || 0.2)),
+          surprise: Math.max(0, Math.min(1, parsed.emotions?.surprise || 0.2)),
+        },
+        keywords: Array.isArray(parsed.keywords) ? parsed.keywords : [],
+      }
     } catch (error) {
       console.log("[v0] Error analyzing sentiment:", error)
-      // Return neutral sentiment on error
       return {
-        score: 0,
+        score: 0.5,
         confidence: 0.3,
         emotions: { joy: 0.2, anger: 0.2, fear: 0.2, sadness: 0.2, surprise: 0.2 },
         keywords: [],
@@ -154,13 +190,24 @@ export class AzureSentimentService {
       }
 
       const data = await response.json()
-      const content = data.choices[0]?.message?.content
+      const content = data.choices?.[0]?.message?.content // Added optional chaining
 
       if (!content) {
         throw new Error("No content in response")
       }
 
-      return JSON.parse(content)
+      const parsed = this.safeParseJSON(content)
+      if (!parsed) {
+        throw new Error("Failed to parse JSON response")
+      }
+
+      return {
+        exhaustionKeywords: Math.max(0, Math.min(100, parsed.exhaustionKeywords || 10)),
+        negativeSentimentTrend: Math.max(0, Math.min(100, parsed.negativeSentimentTrend || 15)),
+        reducedEngagement: Math.max(0, Math.min(100, parsed.reducedEngagement || 20)),
+        workHoursPattern: Math.max(0, Math.min(100, parsed.workHoursPattern || 5)),
+        overallRisk: Math.max(0, Math.min(100, parsed.overallRisk || 25)),
+      }
     } catch (error) {
       console.log("[v0] Error analyzing burnout risk:", error)
       // Return low risk on error
@@ -216,13 +263,18 @@ export class AzureSentimentService {
       }
 
       const data = await response.json()
-      const content = data.choices[0]?.message?.content
+      const content = data.choices?.[0]?.message?.content // Added optional chaining
 
       if (!content) {
         throw new Error("No content in response")
       }
 
-      return JSON.parse(content)
+      const parsed = this.safeParseJSON(content)
+      if (!parsed || !Array.isArray(parsed)) {
+        throw new Error("Invalid insights format")
+      }
+
+      return parsed
     } catch (error) {
       console.log("[v0] Error generating insights:", error)
       // Return default insights on error

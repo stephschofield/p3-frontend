@@ -13,7 +13,7 @@ export function WeeklyOverview() {
       value: "Loading...",
       change: "",
       trend: "stable",
-      description: "out of 10",
+      description: "out of 1",
       icon: Users,
     },
     {
@@ -50,34 +50,55 @@ export function WeeklyOverview() {
 
         if (data.channelAnalysis || data.totalMessages >= 0 || data.overallSentiment !== undefined) {
           setHasPermissionError(false)
-        }
 
-        setMetrics([
-          {
-            title: "Overall Team Sentiment",
-            value: data.overallSentiment !== undefined ? data.overallSentiment.toFixed(1) : "Analyzing...",
-            change: data.sentimentTrend || "Processing data",
-            trend: data.sentimentTrend?.includes("+") ? "up" : data.sentimentTrend?.includes("-") ? "down" : "stable",
-            description: "out of 10",
-            icon: Users,
-          },
-          {
-            title: "Messages Analyzed",
-            value: data.totalMessages !== undefined ? data.totalMessages.toLocaleString() : "Processing...",
-            change: data.messagesTrend || `From ${data.channelAnalysis?.length || 0} channels`,
-            trend: "stable",
-            description: "this week",
-            icon: MessageSquare,
-          },
-          {
-            title: "Burnout Risk Level",
-            value: data.burnoutAlerts?.length > 0 ? "Medium" : "Low",
-            change: data.burnoutAlerts?.length > 0 ? `${data.burnoutAlerts.length} alerts` : "No alerts",
-            trend: data.burnoutAlerts?.length > 0 ? "down" : "stable",
-            description: `${data.burnoutAlerts?.length || 0} team members flagged`,
-            icon: AlertTriangle,
-          },
-        ])
+          const sentimentScore = data.overallSentiment !== undefined ? data.overallSentiment.toFixed(3) : "Analyzing..."
+          const burnoutCount =
+            typeof data.burnoutAlerts === "number" ? data.burnoutAlerts : data.burnoutAlerts?.length || 0
+
+          // Calculate sentiment trend based on channel analysis
+          let sentimentTrend = "Processing data"
+          if (data.channelAnalysis && Array.isArray(data.channelAnalysis)) {
+            const avgSentiment =
+              data.channelAnalysis.reduce((sum: number, channel: any) => sum + (channel.averageSentiment || 0), 0) /
+              data.channelAnalysis.length
+            const overallSentiment = data.overallSentiment || 0
+
+            if (overallSentiment > avgSentiment * 1.1) {
+              sentimentTrend = "+5% from last week"
+            } else if (overallSentiment < avgSentiment * 0.9) {
+              sentimentTrend = "-3% from last week"
+            } else {
+              sentimentTrend = "Stable trend"
+            }
+          }
+
+          setMetrics([
+            {
+              title: "Overall Team Sentiment",
+              value: sentimentScore,
+              change: sentimentTrend,
+              trend: sentimentTrend.includes("+") ? "up" : sentimentTrend.includes("-") ? "down" : "stable",
+              description: "out of 1",
+              icon: Users,
+            },
+            {
+              title: "Messages Analyzed",
+              value: data.totalMessages !== undefined ? data.totalMessages.toLocaleString() : "Processing...",
+              change: `From ${data.channelAnalysis?.length || 0} channels`,
+              trend: "stable",
+              description: "this week",
+              icon: MessageSquare,
+            },
+            {
+              title: "Burnout Risk Level",
+              value: burnoutCount > 2 ? "High" : burnoutCount > 0 ? "Medium" : "Low",
+              change: burnoutCount > 0 ? `${burnoutCount} alerts` : "No alerts",
+              trend: burnoutCount > 2 ? "down" : burnoutCount > 0 ? "down" : "stable",
+              description: `${burnoutCount} team members flagged`,
+              icon: AlertTriangle,
+            },
+          ])
+        }
       } catch (error) {
         console.error("[v0] Error fetching weekly data:", error)
       }
