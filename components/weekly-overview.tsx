@@ -3,8 +3,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { TrendingUp, TrendingDown, Minus, Users, MessageSquare, AlertTriangle } from "lucide-react"
 import { useEffect, useState } from "react"
+import { SlackPermissionsGuide } from "./slack-permissions-guide"
 
 export function WeeklyOverview() {
+  const [hasPermissionError, setHasPermissionError] = useState(false)
   const [metrics, setMetrics] = useState([
     {
       title: "Overall Team Sentiment",
@@ -41,34 +43,38 @@ export function WeeklyOverview() {
 
         console.log("[v0] Weekly analysis response:", data)
 
-        if (data.error) {
-          console.error("[v0] API error:", data.error)
+        if (data.error && (data.error.includes("missing_scope") || data.error.includes("Bot needs"))) {
+          setHasPermissionError(true)
           return
+        }
+
+        if (data.channelAnalysis || data.totalMessages >= 0 || data.overallSentiment !== undefined) {
+          setHasPermissionError(false)
         }
 
         setMetrics([
           {
             title: "Overall Team Sentiment",
-            value: data.overallSentiment?.toFixed(1) || "N/A",
-            change: data.sentimentTrend || "No trend",
+            value: data.overallSentiment !== undefined ? data.overallSentiment.toFixed(1) : "Analyzing...",
+            change: data.sentimentTrend || "Processing data",
             trend: data.sentimentTrend?.includes("+") ? "up" : data.sentimentTrend?.includes("-") ? "down" : "stable",
             description: "out of 10",
             icon: Users,
           },
           {
             title: "Messages Analyzed",
-            value: data.totalMessages?.toLocaleString() || "0",
-            change: data.messagesTrend || "No data",
+            value: data.totalMessages !== undefined ? data.totalMessages.toLocaleString() : "Processing...",
+            change: data.messagesTrend || `From ${data.channelAnalysis?.length || 0} channels`,
             trend: "stable",
             description: "this week",
             icon: MessageSquare,
           },
           {
             title: "Burnout Risk Level",
-            value: data.burnoutRisk?.level || "Unknown",
-            change: data.burnoutRisk?.trend || "Analyzing",
-            trend: data.burnoutRisk?.trend === "Increasing" ? "down" : "stable",
-            description: `${data.burnoutRisk?.flaggedMembers || 0} team members flagged`,
+            value: data.burnoutAlerts?.length > 0 ? "Medium" : "Low",
+            change: data.burnoutAlerts?.length > 0 ? `${data.burnoutAlerts.length} alerts` : "No alerts",
+            trend: data.burnoutAlerts?.length > 0 ? "down" : "stable",
+            description: `${data.burnoutAlerts?.length || 0} team members flagged`,
             icon: AlertTriangle,
           },
         ])
@@ -100,6 +106,10 @@ export function WeeklyOverview() {
       default:
         return "text-muted-foreground"
     }
+  }
+
+  if (hasPermissionError) {
+    return <SlackPermissionsGuide />
   }
 
   return (

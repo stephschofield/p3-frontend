@@ -6,20 +6,47 @@ import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Hash, Users, Search, Plus } from "lucide-react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+
+interface SlackChannel {
+  id: string
+  name: string
+  members: number
+  description: string
+}
 
 export function ChannelSelector() {
   const [searchTerm, setSearchTerm] = useState("")
-  const [selectedChannels, setSelectedChannels] = useState<string[]>(["general", "engineering"])
+  const [selectedChannels, setSelectedChannels] = useState<string[]>([])
+  const [channels, setChannels] = useState<SlackChannel[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const channels = [
-    { id: "general", name: "general", members: 45, description: "Company-wide announcements and general discussion" },
-    { id: "engineering", name: "engineering", members: 12, description: "Engineering team discussions and updates" },
-    { id: "marketing", name: "marketing", members: 8, description: "Marketing team coordination and campaigns" },
-    { id: "product", name: "product", members: 15, description: "Product development and roadmap discussions" },
-    { id: "random", name: "random", members: 32, description: "Casual conversations and team bonding" },
-    { id: "support", name: "support", members: 6, description: "Customer support team coordination" },
-  ]
+  useEffect(() => {
+    const fetchChannels = async () => {
+      try {
+        console.log("[v0] Fetching Slack channels...")
+        const response = await fetch("/api/slack/channels")
+        const data = await response.json()
+
+        if (data.channels && Array.isArray(data.channels)) {
+          const channelData = data.channels.map((channel: any) => ({
+            id: channel.id,
+            name: channel.name,
+            members: channel.num_members || 0,
+            description: channel.purpose?.value || channel.topic?.value || "No description available",
+          }))
+          setChannels(channelData)
+          setSelectedChannels(channelData.slice(0, 2).map((c: SlackChannel) => c.id))
+        }
+      } catch (error) {
+        console.error("[v0] Error fetching channels:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchChannels()
+  }, [])
 
   const filteredChannels = channels.filter(
     (channel) =>

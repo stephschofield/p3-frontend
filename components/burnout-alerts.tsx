@@ -23,46 +23,42 @@ export function BurnoutAlerts() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Simulate loading burnout alerts
-    setTimeout(() => {
-      setAlerts([
-        {
-          id: "1",
-          userId: "U123456",
-          userName: "Alex Chen",
-          riskScore: 78,
-          riskLevel: "high",
-          indicators: [
-            "Increased negative sentiment over 2 weeks",
-            "Reduced participation in team discussions",
-            "Messages sent outside normal hours",
-          ],
-          recommendations: [
-            "Schedule immediate 1:1 check-in",
-            "Review current project workload",
-            "Consider temporary workload reduction",
-          ],
-          lastUpdated: new Date(),
-          acknowledged: false,
-        },
-        {
-          id: "2",
-          userId: "U789012",
-          userName: "Sarah Kim",
-          riskScore: 65,
-          riskLevel: "medium",
-          indicators: ["Exhaustion-related keywords detected", "Declining engagement in team channels"],
-          recommendations: [
-            "Check in during next team meeting",
-            "Offer flexible work arrangements",
-            "Encourage time off if needed",
-          ],
-          lastUpdated: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-          acknowledged: false,
-        },
-      ])
-      setLoading(false)
-    }, 1000)
+    const fetchBurnoutAlerts = async () => {
+      try {
+        console.log("[v0] Fetching burnout alerts...")
+        const response = await fetch("/api/burnout/alerts")
+        const data = await response.json()
+
+        if (data.alerts && Array.isArray(data.alerts)) {
+          const processedAlerts = data.alerts.map((alert: any) => ({
+            ...alert,
+            lastUpdated: alert.lastUpdated ? new Date(alert.lastUpdated) : new Date(),
+          }))
+          setAlerts(processedAlerts)
+        } else if (data.burnoutAlerts && Array.isArray(data.burnoutAlerts)) {
+          // Convert from weekly analysis format
+          const alertData = data.burnoutAlerts.map((alert: any, index: number) => ({
+            id: `alert-${index}`,
+            userId: alert.userId || `user-${index}`,
+            userName: alert.userName || `Team Member ${index + 1}`,
+            riskScore: alert.riskScore || 0,
+            riskLevel: alert.riskLevel || "low",
+            indicators: alert.indicators || ["Sentiment analysis indicates potential stress"],
+            recommendations: alert.recommendations || ["Schedule check-in with team member"],
+            lastUpdated: new Date(),
+            acknowledged: false,
+          }))
+          setAlerts(alertData)
+        }
+      } catch (error) {
+        console.error("[v0] Error fetching burnout alerts:", error)
+        setAlerts([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchBurnoutAlerts()
   }, [])
 
   const getRiskColor = (level: string) => {
@@ -168,7 +164,11 @@ export function BurnoutAlerts() {
                   </div>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <Clock className="h-3 w-3" />
-                    <span>{alert.lastUpdated.toLocaleDateString()}</span>
+                    <span>
+                      {alert.lastUpdated instanceof Date
+                        ? alert.lastUpdated.toLocaleDateString()
+                        : new Date(alert.lastUpdated).toLocaleDateString()}
+                    </span>
                   </div>
                 </div>
 

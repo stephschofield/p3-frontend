@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { TrendingUp, TrendingDown, Minus, AlertTriangle } from "lucide-react"
+import { useEffect, useState } from "react"
 
 interface BurnoutTrendData {
   week: string
@@ -13,15 +14,78 @@ interface BurnoutTrendData {
 }
 
 export function BurnoutTrends() {
-  const trendData: BurnoutTrendData[] = [
-    { week: "Aug 5-9", totalRisk: 32, highRiskCount: 1, mediumRiskCount: 3, lowRiskCount: 2, trend: "down" },
-    { week: "Aug 12-16", totalRisk: 28, highRiskCount: 1, mediumRiskCount: 2, lowRiskCount: 3, trend: "down" },
-    { week: "Aug 19-23", totalRisk: 35, highRiskCount: 2, mediumRiskCount: 2, lowRiskCount: 2, trend: "up" },
-    { week: "Aug 26-30", totalRisk: 31, highRiskCount: 1, mediumRiskCount: 3, lowRiskCount: 1, trend: "down" },
-  ]
+  const [trendData, setTrendData] = useState<BurnoutTrendData[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchTrendData = async () => {
+      try {
+        const response = await fetch("/api/burnout/trends")
+        const data = await response.json()
+
+        if (data.trends && Array.isArray(data.trends)) {
+          setTrendData(data.trends)
+        } else {
+          setTrendData([
+            {
+              week: "Current Week",
+              totalRisk: 0,
+              highRiskCount: 0,
+              mediumRiskCount: 0,
+              lowRiskCount: 0,
+              trend: "stable",
+            },
+          ])
+        }
+      } catch (error) {
+        console.error("[v0] Error fetching burnout trends:", error)
+        setTrendData([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchTrendData()
+  }, [])
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5" />
+            Burnout Risk Trends
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center py-8">
+            <div className="text-muted-foreground">Loading burnout trend analysis...</div>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (trendData.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5" />
+            Burnout Risk Trends
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8">
+            <p className="text-muted-foreground">No trend data available yet. Check back after more analysis cycles.</p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
 
   const currentWeek = trendData[trendData.length - 1]
-  const previousWeek = trendData[trendData.length - 2]
+  const previousWeek = trendData.length > 1 ? trendData[trendData.length - 2] : currentWeek
   const weeklyChange = currentWeek.totalRisk - previousWeek.totalRisk
 
   const getTrendIcon = (trend: string) => {

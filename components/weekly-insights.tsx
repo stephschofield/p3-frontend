@@ -4,8 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { BarChart3, TrendingUp, TrendingDown, Minus } from "lucide-react"
 import { useEffect, useState } from "react"
+import { SlackPermissionsGuide } from "./slack-permissions-guide"
 
 export function WeeklyInsights() {
+  const [hasPermissionError, setHasPermissionError] = useState(false)
   const [sentimentData, setSentimentData] = useState([{ day: "Loading...", sentiment: 0, messages: 0 }])
   const [overallTrend, setOverallTrend] = useState("stable")
   const [insights, setInsights] = useState([
@@ -23,19 +25,39 @@ export function WeeklyInsights() {
 
         console.log("[v0] Weekly insights response:", data)
 
-        if (data.error) {
-          console.error("[v0] API error:", data.error)
+        if (data.error && (data.error.includes("missing_scope") || data.error.includes("Bot needs"))) {
+          setHasPermissionError(true)
           return
         }
 
-        if (data.dailyBreakdown && Array.isArray(data.dailyBreakdown)) {
-          setSentimentData(
-            data.dailyBreakdown.map((day: any) => ({
-              day: day.day || "N/A",
-              sentiment: day.sentiment || 0,
-              messages: day.messages || 0,
-            })),
-          )
+        if (data.channelAnalysis || data.totalMessages >= 0 || data.insights) {
+          setHasPermissionError(false)
+        }
+
+        if (data.channelAnalysis && Array.isArray(data.channelAnalysis)) {
+          const dailyData = []
+          const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
+          for (let i = 0; i < 7; i++) {
+            const dayData = data.channelAnalysis.reduce(
+              (acc: any, channel: any) => {
+                const sentiment = channel.averageSentiment || 5.0
+                const messages = Math.floor(channel.messageCount / 7) || 0
+                return {
+                  sentiment: (acc.sentiment + sentiment) / 2,
+                  messages: acc.messages + messages,
+                }
+              },
+              { sentiment: 5.0, messages: 0 },
+            )
+
+            dailyData.push({
+              day: days[i],
+              sentiment: dayData.sentiment,
+              messages: dayData.messages,
+            })
+          }
+          setSentimentData(dailyData)
         }
 
         if (data.sentimentTrend) {
@@ -48,8 +70,27 @@ export function WeeklyInsights() {
           }
         }
 
-        if (data.insights && Array.isArray(data.insights)) {
-          setInsights(data.insights.slice(0, 3)) // Show top 3 insights
+        if (data.insights && Array.isArray(data.insights) && data.insights.length > 0) {
+          const processedInsights = data.insights.slice(0, 3).map((insight: any) => {
+            if (typeof insight === "string") {
+              return insight
+            } else if (insight && typeof insight === "object") {
+              // Extract meaningful text from insight object
+              return insight.description || insight.title || insight.summary || "AI-generated insight available"
+            }
+            return "Processing insight..."
+          })
+          setInsights(processedInsights)
+        } else if (data.channelAnalysis && data.channelAnalysis.length > 0) {
+          const channelCount = data.channelAnalysis.length
+          const totalMessages = data.totalMessages || 0
+          const avgSentiment = data.overallSentiment || 5.0
+
+          setInsights([
+            `Analyzed ${totalMessages} messages across ${channelCount} channels this week`,
+            `Overall team sentiment is ${avgSentiment >= 7 ? "positive" : avgSentiment >= 5 ? "neutral" : "concerning"}`,
+            `${data.burnoutAlerts?.length || 0} team members showing potential burnout indicators`,
+          ])
         }
       } catch (error) {
         console.error("[v0] Error fetching insights data:", error)
@@ -109,6 +150,10 @@ export function WeeklyInsights() {
     }
   }
 
+  if (hasPermissionError) {
+    return <SlackPermissionsGuide />
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -155,7 +200,7 @@ export function WeeklyInsights() {
           <h4 className="text-sm font-medium text-foreground mb-2">AI-Generated Insights</h4>
           <ul className="text-sm text-muted-foreground space-y-1">
             {insights.map((insight, index) => (
-              <li key={index}>• {insight}</li>
+              <li key={index}>• {typeof insight === "string" ? insight : "Processing insight..."}</li>
             ))}
           </ul>
         </div>
